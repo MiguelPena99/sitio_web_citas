@@ -3,52 +3,66 @@
 import { useState } from 'react';
 import '../../styles/registro.css';
 import { useRouter } from 'next/navigation';
-import jwt from 'jsonwebtoken';
 
-export default function RegistroPage() {
-  const [formData, setFormData] = useState({ 
-    nombre: '', 
-    apellido: '', 
-    telefono: '', 
-    contrasena: '' 
+export default function HacerCitaPage() {
+  const [formData, setFormData] = useState({
+    nombre: '',
+    apellido: '',
+    telefono: '',
+    fecha: '',
   });
   const [message, setMessage] = useState('');
   const router = useRouter();
 
+  // 🔹 Función para sanitizar inputs
+  const sanitizeInput = (value, type) => {
+    switch (type) {
+      case 'nombre':
+      case 'apellido':
+        return value.replace(/[^a-zA-ZÀ-ÿ\s]/g, '').trim();
+      case 'telefono':
+        return value.replace(/\D/g, '').slice(0, 10);
+      case 'fecha':
+        return value.replace(/[^0-9\-]/g, '').trim(); // formato yyyy-mm-dd
+      default:
+        return value.trim();
+    }
+  };
+
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setFormData({ ...formData, [name]: sanitizeInput(value, name) });
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setMessage('Registrando usuario...');
+    setMessage('Enviando cita...');
 
-    const response = await fetch('/api/auth/registro', { 
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(formData),
-    });
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/citas/crear', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`, 
+        },
+        body: JSON.stringify(formData),
+      });
 
-    const data = await response.json();
-    setMessage(data.message);
+      const data = await response.json();
+      setMessage(data.message);
 
-    if (response.ok) {
-      //guarda el token y redirige al usuario
-      localStorage.setItem('token', data.token);
-
-      const decodedToken = jwt.decode(data.token);
-      
-      if (decodedToken && decodedToken.admin) {
-        router.push('/admin');
-      } else {
-        router.push('/hacer-cita');
+      if (response.ok) {
+        router.push('/confirmacion-cita');
       }
+    } catch (err) {
+      setMessage('Error al enviar la cita');
     }
   };
 
   return (
     <div className="registro-container">
-      <h1 className="registro-title">Registro de Usuario</h1>
+      <h1 className="registro-title">Hacer Cita</h1>
       <form onSubmit={handleSubmit} className="registro-form">
         <input
           type="text"
@@ -78,16 +92,16 @@ export default function RegistroPage() {
           className="registro-input"
         />
         <input
-          type="password"
-          name="contrasena"
-          placeholder="Contraseña"
-          value={formData.contrasena}
+          type="date"
+          name="fecha"
+          placeholder="Fecha de la cita"
+          value={formData.fecha}
           onChange={handleChange}
           required
           className="registro-input"
         />
         <button type="submit" className="registro-button">
-          Registrarse
+          Confirmar Cita
         </button>
       </form>
       {message && <p className="registro-message">{message}</p>}
